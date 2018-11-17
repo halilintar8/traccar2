@@ -19,6 +19,7 @@ import io.netty.channel.Channel;
 import org.traccar.BaseProtocolDecoder;
 import org.traccar.DeviceSession;
 import org.traccar.NetworkMessage;
+import org.traccar.Protocol;
 import org.traccar.helper.Parser;
 import org.traccar.helper.PatternBuilder;
 import org.traccar.helper.UnitsConverter;
@@ -29,7 +30,7 @@ import java.util.regex.Pattern;
 
 public class Tr20ProtocolDecoder extends BaseProtocolDecoder {
 
-    public Tr20ProtocolDecoder(Tr20Protocol protocol) {
+    public Tr20ProtocolDecoder(Protocol protocol) {
         super(protocol);
     }
 
@@ -51,6 +52,9 @@ public class Tr20ProtocolDecoder extends BaseProtocolDecoder {
             .number("(ddd)(dd.d+),")             // longitude
             .number("(d+),")                     // speed
             .number("(d+),")                     // course
+            .number("(?:NA|[FC](-?d+)),")        // temperature
+            .number("(x{8}),")                   // status
+            .number("(d+)")                      // event
             .any()
             .compile();
 
@@ -86,8 +90,12 @@ public class Tr20ProtocolDecoder extends BaseProtocolDecoder {
 
         position.setLatitude(parser.nextCoordinate(Parser.CoordinateFormat.HEM_DEG_MIN));
         position.setLongitude(parser.nextCoordinate(Parser.CoordinateFormat.HEM_DEG_MIN));
-        position.setSpeed(UnitsConverter.knotsFromKph(parser.nextDouble(0)));
-        position.setCourse(parser.nextDouble(0));
+        position.setSpeed(UnitsConverter.knotsFromKph(parser.nextDouble()));
+        position.setCourse(parser.nextDouble());
+
+        position.set(Position.PREFIX_TEMP + 1, parser.nextInt());
+        position.set(Position.KEY_STATUS, parser.nextHexLong());
+        position.set(Position.KEY_EVENT, parser.nextInt());
 
         return position;
     }

@@ -19,17 +19,21 @@ import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.channel.socket.DatagramChannel;
+import io.netty.handler.codec.http.HttpRequestDecoder;
 import io.netty.handler.timeout.IdleStateEvent;
-import org.traccar.helper.Log;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.traccar.helper.DateUtil;
 import org.traccar.model.Position;
 
 import java.sql.SQLException;
-import java.text.SimpleDateFormat;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Set;
 
 public class MainEventHandler extends ChannelInboundHandlerAdapter {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(GeocoderHandler.class);
 
     private final Set<String> connectionlessProtocols = new HashSet<>();
 
@@ -48,7 +52,7 @@ public class MainEventHandler extends ChannelInboundHandlerAdapter {
             try {
                 Context.getDeviceManager().updateLatestPosition(position);
             } catch (SQLException error) {
-                Log.warning(error);
+                LOGGER.warn("Failed to update device", error);
             }
 
             String uniqueId = Context.getIdentityManager().getById(position.getDeviceId()).getUniqueId();
@@ -57,8 +61,7 @@ public class MainEventHandler extends ChannelInboundHandlerAdapter {
             StringBuilder s = new StringBuilder();
             s.append(formatChannel(ctx.channel())).append(" ");
             s.append("id: ").append(uniqueId);
-            s.append(", time: ").append(
-                    new SimpleDateFormat(Log.DATE_FORMAT).format(position.getFixTime()));
+            s.append(", time: ").append(DateUtil.formatDate(position.getFixTime(), false));
             s.append(", lat: ").append(String.format("%.5f", position.getLatitude()));
             s.append(", lon: ").append(String.format("%.5f", position.getLongitude()));
             if (position.getSpeed() > 0) {
@@ -72,7 +75,7 @@ public class MainEventHandler extends ChannelInboundHandlerAdapter {
             if (cmdResult != null) {
                 s.append(", result: ").append(cmdResult);
             }
-            Log.info(s.toString());
+            LOGGER.info(s.toString());
 
             Context.getStatisticsManager().registerMessageStored(position.getDeviceId());
         }
@@ -84,31 +87,32 @@ public class MainEventHandler extends ChannelInboundHandlerAdapter {
 
     @Override
     public void channelActive(ChannelHandlerContext ctx) throws Exception {
-        Log.info(formatChannel(ctx.channel()) + " connected");
+        if (!(ctx.channel() instanceof DatagramChannel)) {
+            LOGGER.info(formatChannel(ctx.channel()) + " connected");
+        }
     }
 
     @Override
     public void channelInactive(ChannelHandlerContext ctx) throws Exception {
-        Log.info(formatChannel(ctx.channel()) + " disconnected");
+        LOGGER.info(formatChannel(ctx.channel()) + " disconnected");
         closeChannel(ctx.channel());
 
-        BaseProtocolDecoder protocolDecoder = (BaseProtocolDecoder) ctx.pipeline().get("objectDecoder");
-        if (ctx.pipeline().get("httpDecoder") == null
-                && !connectionlessProtocols.contains(protocolDecoder.getProtocolName())) {
+        if (BasePipelineFactory.getHandler(ctx.pipeline(), HttpRequestDecoder.class) == null
+                && !connectionlessProtocols.contains(ctx.pipeline().get(BaseProtocolDecoder.class).getProtocolName())) {
             Context.getConnectionManager().removeActiveDevice(ctx.channel());
         }
     }
 
     @Override
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
-        Log.warning(formatChannel(ctx.channel()) + " error", cause);
+        LOGGER.warn(formatChannel(ctx.channel()) + " error", cause);
         closeChannel(ctx.channel());
     }
 
     @Override
     public void userEventTriggered(ChannelHandlerContext ctx, Object evt) throws Exception {
         if (evt instanceof IdleStateEvent) {
-            Log.info(formatChannel(ctx.channel()) + " timed out");
+            LOGGER.info(formatChannel(ctx.channel()) + " timed out");
             closeChannel(ctx.channel());
         }
     }

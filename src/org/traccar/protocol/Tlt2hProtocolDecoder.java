@@ -18,6 +18,7 @@ package org.traccar.protocol;
 import io.netty.channel.Channel;
 import org.traccar.BaseProtocolDecoder;
 import org.traccar.DeviceSession;
+import org.traccar.Protocol;
 import org.traccar.helper.DateBuilder;
 import org.traccar.helper.Parser;
 import org.traccar.helper.PatternBuilder;
@@ -30,14 +31,13 @@ import java.util.regex.Pattern;
 
 public class Tlt2hProtocolDecoder extends BaseProtocolDecoder {
 
-    public Tlt2hProtocolDecoder(Tlt2hProtocol protocol) {
+    public Tlt2hProtocolDecoder(Protocol protocol) {
         super(protocol);
     }
 
     private static final Pattern PATTERN_HEADER = new PatternBuilder()
             .number("#(d+)#")                    // imei
-            .expression("[^#]*#")
-            .number("d+#")
+            .any()
             .expression("([^#]+)#")              // status
             .number("d+")                        // number of records
             .compile();

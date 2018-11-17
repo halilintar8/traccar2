@@ -18,6 +18,7 @@ package org.traccar.protocol;
 import io.netty.channel.Channel;
 import org.traccar.BaseProtocolDecoder;
 import org.traccar.DeviceSession;
+import org.traccar.Protocol;
 import org.traccar.helper.BitUtil;
 import org.traccar.helper.Parser;
 import org.traccar.helper.PatternBuilder;
@@ -29,7 +30,7 @@ import java.util.regex.Pattern;
 
 public class MiniFinderProtocolDecoder extends BaseProtocolDecoder {
 
-    public MiniFinderProtocolDecoder(MiniFinderProtocol protocol) {
+    public MiniFinderProtocolDecoder(Protocol protocol) {
         super(protocol);
     }
 
@@ -142,7 +143,7 @@ public class MiniFinderProtocolDecoder extends BaseProtocolDecoder {
         }
 
         DeviceSession deviceSession = getDeviceSession(channel, remoteAddress);
-        if (deviceSession == null || !sentence.matches("![A-D],.*")) {
+        if (deviceSession == null || !sentence.matches("![3A-D],.*")) {
             return null;
         }
 
@@ -152,7 +153,15 @@ public class MiniFinderProtocolDecoder extends BaseProtocolDecoder {
         String type = sentence.substring(1, 2);
         position.set(Position.KEY_TYPE, type);
 
-        if (type.equals("B") || type.equals("D")) {
+        if (type.equals("3")) {
+
+            getLastLocation(position, null);
+
+            position.set(Position.KEY_RESULT, sentence.substring(3));
+
+            return position;
+
+        } else if (type.equals("B") || type.equals("D")) {
 
             Parser parser = new Parser(PATTERN_BD, sentence);
             if (!parser.matches()) {

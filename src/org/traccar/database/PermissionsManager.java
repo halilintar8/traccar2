@@ -15,8 +15,9 @@
  */
 package org.traccar.database;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.traccar.Context;
-import org.traccar.helper.Log;
 import org.traccar.model.Attribute;
 import org.traccar.model.BaseModel;
 import org.traccar.model.Calendar;
@@ -39,6 +40,8 @@ import java.util.Map;
 import java.util.Set;
 
 public class PermissionsManager {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(PermissionsManager.class);
 
     private final DataManager dataManager;
     private final UsersManager usersManager;
@@ -63,21 +66,21 @@ public class PermissionsManager {
 
     public Set<Long> getGroupPermissions(long userId) {
         if (!groupPermissions.containsKey(userId)) {
-            groupPermissions.put(userId, new HashSet<Long>());
+            groupPermissions.put(userId, new HashSet<>());
         }
         return groupPermissions.get(userId);
     }
 
     public Set<Long> getDevicePermissions(long userId) {
         if (!devicePermissions.containsKey(userId)) {
-            devicePermissions.put(userId, new HashSet<Long>());
+            devicePermissions.put(userId, new HashSet<>());
         }
         return devicePermissions.get(userId);
     }
 
     private Set<Long> getAllDeviceUsers(long deviceId) {
         if (!deviceUsers.containsKey(deviceId)) {
-            deviceUsers.put(deviceId, new HashSet<Long>());
+            deviceUsers.put(deviceId, new HashSet<>());
         }
         return deviceUsers.get(deviceId);
     }
@@ -99,7 +102,7 @@ public class PermissionsManager {
 
     public Set<Long> getGroupDevices(long groupId) {
         if (!groupDevices.containsKey(groupId)) {
-            groupDevices.put(groupId, new HashSet<Long>());
+            groupDevices.put(groupId, new HashSet<>());
         }
         return groupDevices.get(groupId);
     }
@@ -108,7 +111,7 @@ public class PermissionsManager {
         try {
             server = dataManager.getServer();
         } catch (SQLException error) {
-            Log.warning(error);
+            LOGGER.warn("Refresh server config error", error);
         }
     }
 
@@ -143,7 +146,7 @@ public class PermissionsManager {
             }
 
         } catch (SQLException | ClassNotFoundException error) {
-            Log.warning(error);
+            LOGGER.warn("Refresh device permissions error", error);
         }
 
         deviceUsers.clear();
@@ -190,7 +193,7 @@ public class PermissionsManager {
         }
     }
 
-    public void checkDeviceLimit(long userId) throws SecurityException, SQLException {
+    public void checkDeviceLimit(long userId) throws SecurityException {
         int deviceLimit = getUser(userId).getDeviceLimit();
         if (deviceLimit != -1) {
             int deviceCount = 0;

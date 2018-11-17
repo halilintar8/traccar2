@@ -19,6 +19,7 @@ import io.netty.channel.Channel;
 import org.traccar.BaseProtocolDecoder;
 import org.traccar.DeviceSession;
 import org.traccar.NetworkMessage;
+import org.traccar.Protocol;
 import org.traccar.helper.DateBuilder;
 import org.traccar.helper.Parser;
 import org.traccar.helper.PatternBuilder;
@@ -33,7 +34,7 @@ import java.util.regex.Pattern;
 
 public class Gps103ProtocolDecoder extends BaseProtocolDecoder {
 
-    public Gps103ProtocolDecoder(Gps103Protocol protocol) {
+    public Gps103ProtocolDecoder(Protocol protocol) {
         super(protocol);
     }
 
@@ -85,7 +86,7 @@ public class Gps103ProtocolDecoder extends BaseProtocolDecoder {
             .expression("OBD,")                  // type
             .number("(dd)(dd)(dd)")              // date (yymmdd)
             .number("(dd)(dd)(dd),")             // time (hhmmss)
-            .number("(d+),")                     // odometer
+            .number("(d+)?,")                    // odometer
             .number("(d+.d+)?,")                 // fuel instant
             .number("(d+.d+)?,")                 // fuel average
             .number("(d+)?,")                    // hours
@@ -96,6 +97,27 @@ public class Gps103ProtocolDecoder extends BaseProtocolDecoder {
             .number("(d+),")                     // rpm
             .number("(d+.d+),")                  // battery
             .number("([^;]*)")                   // dtcs
+            .any()
+            .compile();
+
+    private static final Pattern PATTERN_ALT = new PatternBuilder()
+            .text("imei:")
+            .number("(d+),")                     // imei
+            .expression("[^,]+,")
+            .expression("...,")                  // event
+            .expression(".{6},")                 // sensor id
+            .expression(".{4},")                 // sensor voltage
+            .number("(dd)(dd)(dd),")             // time (hhmmss)
+            .number("(dd)(dd)(dd),")             // date (ddmmyy)
+            .number("(d+),")                     // rssi
+            .number("(d),")                      // gps status
+            .number("(-?d+.d+),")                // latitude
+            .number("(-?d+.d+),")                // longitude
+            .number("(d+),")                     // speed
+            .number("(d+),")                     // course
+            .number("(-?d+),")                   // altitude
+            .number("(d+.d+),")                  // hdop
+            .number("(d+),")                     // satellites
             .any()
             .compile();
 
@@ -269,17 +291,50 @@ public class Gps103ProtocolDecoder extends BaseProtocolDecoder {
         return position;
     }
 
+
+    private Position decodeAlternative(Channel channel, SocketAddress remoteAddress, String sentence) {
+
+        Parser parser = new Parser(PATTERN_ALT, sentence);
+        if (!parser.matches()) {
+            return null;
+        }
+
+        DeviceSession deviceSession = getDeviceSession(channel, remoteAddress, parser.next());
+        if (deviceSession == null) {
+            return null;
+        }
+
+        Position position = new Position(getProtocolName());
+        position.setDeviceId(deviceSession.getDeviceId());
+
+        position.setTime(parser.nextDateTime(Parser.DateTimeFormat.HMS_DMY));
+
+        position.set(Position.KEY_RSSI, parser.nextInt());
+
+        position.setValid(parser.nextInt() > 0);
+        position.setLatitude(parser.nextDouble());
+        position.setLongitude(parser.nextDouble());
+        position.setSpeed(UnitsConverter.knotsFromKph(parser.nextInt()));
+        position.setCourse(parser.nextInt());
+        position.setAltitude(parser.nextInt());
+
+        position.set(Position.KEY_HDOP, parser.nextDouble());
+        position.set(Position.KEY_SATELLITES, parser.nextInt());
+
+        return position;
+    }
+
     @Override
     protected Object decode(
             Channel channel, SocketAddress remoteAddress, Object msg) throws Exception {
 
         String sentence = (String) msg;
 
-        if (sentence.contains("##")) {
+        if (sentence.contains("imei:") && sentence.length() <= 30) {
             if (channel != null) {
                 channel.writeAndFlush(new NetworkMessage("LOAD", remoteAddress));
-                Matcher matcher = Pattern.compile("##,imei:(\\d+),A").matcher(sentence);
-                if (matcher.matches()) {
+                Matcher matcher = Pattern.compile("imei:(\\d+),").matcher(sentence);
+                if (matcher.find()) {
                     getDeviceSession(channel, remoteAddress, matcher.group(1));
                 }
             }
@@ -300,6 +355,8 @@ public class Gps103ProtocolDecoder extends BaseProtocolDecoder {
 
         if (sentence.contains("OBD")) {
             return decodeObd(channel, remoteAddress, sentence);
+        } else if (sentence.endsWith("*")) {
+            return decodeAlternative(channel, remoteAddress, sentence);
         } else {
             return decodeRegular(channel, remoteAddress, sentence);
         }

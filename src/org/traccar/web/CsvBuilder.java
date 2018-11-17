@@ -28,17 +28,17 @@ import java.util.SortedSet;
 import java.util.TreeSet;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
-import org.joda.time.DateTime;
-import org.joda.time.format.DateTimeFormatter;
-import org.joda.time.format.ISODateTimeFormat;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.traccar.Context;
-import org.traccar.helper.Log;
+import org.traccar.helper.DateUtil;
 
 public class CsvBuilder {
 
+    private static final Logger LOGGER = LoggerFactory.getLogger(CsvBuilder.class);
+
     private static final String LINE_ENDING = "\r\n";
     private static final String SEPARATOR = ";";
-    private static final DateTimeFormatter DATE_FORMAT = ISODateTimeFormat.dateTime();
 
     private StringBuilder builder = new StringBuilder();
 
@@ -91,7 +91,7 @@ public class CsvBuilder {
                         addSeparator();
                     } else if (method.getReturnType().equals(Date.class)) {
                         Date value = (Date) method.invoke(object);
-                        builder.append(DATE_FORMAT.print(new DateTime(value)));
+                        builder.append(DateUtil.formatDate(value));
                         addSeparator();
                     } else if (method.getReturnType().equals(Map.class)) {
                         Map value = (Map) method.invoke(object);
@@ -103,12 +103,12 @@ public class CsvBuilder {
                                 builder.append(map);
                                 addSeparator();
                             } catch (JsonProcessingException e) {
-                                Log.warning(e);
+                                LOGGER.warn("Map JSON formatting error", e);
                             }
                         }
                     }
                 } catch (IllegalAccessException | InvocationTargetException error) {
-                    Log.warning(error);
+                    LOGGER.warn("Reflection invocation error", error);
                 }
             }
         }
@@ -160,4 +160,5 @@ public class CsvBuilder {
     public String build() {
         return builder.toString();
     }
+
 }

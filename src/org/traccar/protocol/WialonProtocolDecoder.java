@@ -19,6 +19,7 @@ import io.netty.channel.Channel;
 import org.traccar.BaseProtocolDecoder;
 import org.traccar.DeviceSession;
 import org.traccar.NetworkMessage;
+import org.traccar.Protocol;
 import org.traccar.helper.Parser;
 import org.traccar.helper.PatternBuilder;
 import org.traccar.helper.UnitsConverter;
@@ -33,7 +34,7 @@ import java.util.regex.Pattern;
 
 public class WialonProtocolDecoder extends BaseProtocolDecoder {
 
-    public WialonProtocolDecoder(WialonProtocol protocol) {
+    public WialonProtocolDecoder(Protocol protocol) {
         super(protocol);
     }
 
@@ -46,7 +47,7 @@ public class WialonProtocolDecoder extends BaseProtocolDecoder {
             .expression("([EW]);")
             .number("(d+.?d*)?;")                // speed
             .number("(d+.?d*)?;")                // course
-            .number("(?:NA|(d+.?d*));")          // altitude
+            .number("(?:NA|(-?d+.?d*));")        // altitude
             .number("(?:NA|(d+))")               // satellites
             .groupBegin().text(";")
             .number("(?:NA|(d+.?d*));")          // hdop

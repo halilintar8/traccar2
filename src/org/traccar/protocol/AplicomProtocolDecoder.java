@@ -18,11 +18,13 @@ package org.traccar.protocol;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufUtil;
 import io.netty.channel.Channel;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.traccar.BaseProtocolDecoder;
 import org.traccar.Context;
 import org.traccar.DeviceSession;
+import org.traccar.Protocol;
 import org.traccar.helper.Checksum;
-import org.traccar.helper.Log;
 import org.traccar.helper.UnitsConverter;
 import org.traccar.model.Position;
 
@@ -33,7 +35,9 @@ import java.util.Date;
 
 public class AplicomProtocolDecoder extends BaseProtocolDecoder {
 
-    public AplicomProtocolDecoder(AplicomProtocol protocol) {
+    private static final Logger LOGGER = LoggerFactory.getLogger(AplicomProtocolDecoder.class);
+
+    public AplicomProtocolDecoder(Protocol protocol) {
         super(protocol);
     }
 
@@ -103,16 +107,8 @@ public class AplicomProtocolDecoder extends BaseProtocolDecoder {
                 buf.readUnsignedByte();
                 break;
             case 119:
-                StringBuilder sb = new StringBuilder();
-                while (buf.isReadable()) {
-                    char c = (char) buf.readByte();
-                    if (c >= 0x20) {
-                        sb.append(c);
-                    } else {
-                        break;
-                    }
-                }
-                position.set("eventData", sb.toString());
+                position.set("eventData", ByteBufUtil.hexDump(
+                        buf, buf.readerIndex(), Math.min(buf.readableBytes(), 1024)));
                 break;
             case 121:
             case 142:
@@ -203,7 +199,7 @@ public class AplicomProtocolDecoder extends BaseProtocolDecoder {
                     }
                     break;
                 default:
-                    Log.warning(new UnsupportedOperationException());
+                    LOGGER.warn("Aplicom CAN decoding error", new UnsupportedOperationException());
                     break;
             }
         }

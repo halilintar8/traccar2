@@ -8,7 +8,19 @@ public class Gps103ProtocolDecoderTest extends ProtocolTest {
     @Test
     public void testDecode() throws Exception {
 
-        Gps103ProtocolDecoder decoder = new Gps103ProtocolDecoder(new Gps103Protocol());
+        Gps103ProtocolDecoder decoder = new Gps103ProtocolDecoder(null);
+
+        verifyPosition(decoder, text(
+                "imei:861359038609986,Equipo 1,---,------,----,214734,241018,26,1,-33.42317,-70.61930,067,229,0674,1.00,08,0,1,---,*"));
+
+        verifyPosition(decoder, text(
+                "imei:861359038609986,Equipo 1,---,------,----,214812,241018,14,0,-33.42317,-70.61930,000,000,0000,99.9,00,0,1,---,*"));
+
+        verifyNull(decoder, text(
+                "imei:123451234512345,L,*"));
+
+        verifyAttributes(decoder, text(
+                "imei:868683027758113,OBD,180905200218,,,,0,0,0.39%,70,9.41%,494,0.00,P0137,P0430,,;"));
 
         verifyPosition(decoder, text(
                 "imei:353451044508750,001,0809231929,13554900601,F,055403.000,A,2233.1870,N,11354.3067,E,0.00,30.1,65.43,1,0,10.5%,0.0%,28;"));
@@ -25,7 +37,7 @@ public class Gps103ProtocolDecoderTest extends ProtocolTest {
         verifyAttributes(decoder, text(
                 "imei:862106025092216,OBD,170605095949,195874,,370.8,808,066,30.0%,+87,13.0%,02444,14.3,,,,;"));
 
-        verifyNull(decoder, text(
+        verifyAttributes(decoder, text(
                 "imei:868683027825532,OBD,170613203014,,,,0,0,0.00%,0,0.00%,0,0.00,,,,;"));
 
         verifyAttributes(decoder, text(

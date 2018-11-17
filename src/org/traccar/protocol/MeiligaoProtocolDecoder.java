@@ -22,6 +22,7 @@ import org.traccar.BaseProtocolDecoder;
 import org.traccar.Context;
 import org.traccar.DeviceSession;
 import org.traccar.NetworkMessage;
+import org.traccar.Protocol;
 import org.traccar.helper.BitUtil;
 import org.traccar.helper.Checksum;
 import org.traccar.helper.DateBuilder;
@@ -29,7 +30,6 @@ import org.traccar.helper.Parser;
 import org.traccar.helper.PatternBuilder;
 import org.traccar.model.Position;
 
-import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
@@ -42,7 +42,7 @@ public class MeiligaoProtocolDecoder extends BaseProtocolDecoder {
 
     private Map<Byte, ByteBuf> photos = new HashMap<>();
 
-    public MeiligaoProtocolDecoder(MeiligaoProtocol protocol) {
+    public MeiligaoProtocolDecoder(Protocol protocol) {
         super(protocol);
     }
 
@@ -204,15 +204,6 @@ public class MeiligaoProtocolDecoder extends BaseProtocolDecoder {
 
             channel.writeAndFlush(new NetworkMessage(buf, remoteAddress));
         }
-    }
-
-    private String getServer(Channel channel) {
-        String server = Context.getConfig().getString(getProtocolName() + ".server");
-        if (server == null && channel != null) {
-            InetSocketAddress address = (InetSocketAddress) channel.localAddress();
-            server = address.getAddress().getHostAddress() + ":" + address.getPort();
-        }
-        return server;
     }
 
     private String decodeAlarm(short value) {

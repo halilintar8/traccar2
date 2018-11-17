@@ -20,6 +20,7 @@ import io.netty.buffer.ByteBufUtil;
 import io.netty.channel.Channel;
 import org.traccar.BaseProtocolDecoder;
 import org.traccar.DeviceSession;
+import org.traccar.Protocol;
 import org.traccar.helper.BitUtil;
 import org.traccar.helper.DateBuilder;
 import org.traccar.model.CellTower;
@@ -30,7 +31,7 @@ import java.net.SocketAddress;
 
 public class TzoneProtocolDecoder extends BaseProtocolDecoder {
 
-    public TzoneProtocolDecoder(TzoneProtocol protocol) {
+    public TzoneProtocolDecoder(Protocol protocol) {
         super(protocol);
     }
 
@@ -55,6 +56,53 @@ public class TzoneProtocolDecoder extends BaseProtocolDecoder {
             default:
                 return null;
         }
+    }
+
+    private boolean decodeGps(Position position, ByteBuf buf, int hardware) {
+
+        int blockLength = buf.readUnsignedShort();
+        int blockEnd = buf.readerIndex() + blockLength;
+
+        if (blockLength < 22) {
+            return false;
+        }
+
+        position.set(Position.KEY_SATELLITES, buf.readUnsignedByte());
+
+        double lat;
+        double lon;
+
+        if (hardware == 0x10A || hardware == 0x10B) {
+            lat = buf.readUnsignedInt() / 600000.0;
+            lon = buf.readUnsignedInt() / 600000.0;
+        } else {
+            lat = buf.readUnsignedInt() / 100000.0 / 60.0;
+            lon = buf.readUnsignedInt() / 100000.0 / 60.0;
+        }
+
+        position.setFixTime(new DateBuilder()
+                .setDate(buf.readUnsignedByte(), buf.readUnsignedByte(), buf.readUnsignedByte())
+                .setTime(buf.readUnsignedByte(), buf.readUnsignedByte(), buf.readUnsignedByte()).getDate());
+
+        position.setSpeed(buf.readUnsignedShort() * 0.01);
+
+        position.set(Position.KEY_ODOMETER, buf.readUnsignedMedium());
+
+        int flags = buf.readUnsignedShort();
+        position.setCourse(BitUtil.to(flags, 9));
+        if (!BitUtil.check(flags, 10)) {
+            lat = -lat;
+        }
+        position.setLatitude(lat);
+        if (BitUtil.check(flags, 9)) {
+            lon = -lon;
+        }
+        position.setLongitude(lon);
+        position.setValid(BitUtil.check(flags, 11));
+
+        buf.readerIndex(blockEnd);
+
+        return true;
     }
 
     private void decodeCards(Position position, ByteBuf buf) {
@@ -108,6 +156,38 @@ public class TzoneProtocolDecoder extends BaseProtocolDecoder {
 
     }
 
+    private void decodeTags(Position position, ByteBuf buf) {
+
+        int blockLength = buf.readUnsignedShort();
+        int blockEnd = buf.readerIndex() + blockLength;
+
+        if (blockLength > 0) {
+
+            buf.readUnsignedByte(); // tag type
+
+            int count = buf.readUnsignedByte();
+            int tagLength = buf.readUnsignedByte();
+
+            for (int i = 1; i <= count; i++) {
+                int tagEnd = buf.readerIndex() + tagLength;
+
+                buf.readUnsignedByte(); // status
+                buf.readUnsignedShortLE(); // battery voltage
+
+                position.set(Position.PREFIX_TEMP + i, (buf.readShortLE() & 0x3fff) * 0.1);
+
+                buf.readUnsignedByte(); // humidity
+                buf.readUnsignedByte(); // rssi
+
+                buf.readerIndex(tagEnd);
+            }
+
+        }
+
+        buf.readerIndex(blockEnd);
+
+    }
+
     @Override
     protected Object decode(
             Channel channel, SocketAddress remoteAddress, Object msg) throws Exception {
@@ -140,54 +220,18 @@ public class TzoneProtocolDecoder extends BaseProtocolDecoder {
 
         // GPS info
 
-        int blockLength = buf.readUnsignedShort();
-        int blockEnd = buf.readerIndex() + blockLength;
+        if (hardware == 0x406 || !decodeGps(position, buf, hardware)) {
 
-        if (blockLength < 22) {
-            return null;
+            getLastLocation(position, position.getDeviceTime());
+
         }
-
-        position.set(Position.KEY_SATELLITES, buf.readUnsignedByte());
-
-        double lat;
-        double lon;
-
-        if (hardware == 0x10A || hardware == 0x10B) {
-            lat = buf.readUnsignedInt() / 600000.0;
-            lon = buf.readUnsignedInt() / 600000.0;
-        } else {
-            lat = buf.readUnsignedInt() / 100000.0 / 60.0;
-            lon = buf.readUnsignedInt() / 100000.0 / 60.0;
-        }
-
-        position.setFixTime(new DateBuilder()
-                .setDate(buf.readUnsignedByte(), buf.readUnsignedByte(), buf.readUnsignedByte())
-                .setTime(buf.readUnsignedByte(), buf.readUnsignedByte(), buf.readUnsignedByte()).getDate());
-
-        position.setSpeed(buf.readUnsignedShort() * 0.01);
-
-        position.set(Position.KEY_ODOMETER, buf.readUnsignedMedium());
-
-        int flags = buf.readUnsignedShort();
-        position.setCourse(BitUtil.to(flags, 9));
-        if (!BitUtil.check(flags, 10)) {
-            lat = -lat;
-        }
-        position.setLatitude(lat);
-        if (BitUtil.check(flags, 9)) {
-            lon = -lon;
-        }
-        position.setLongitude(lon);
-        position.setValid(BitUtil.check(flags, 11));
-
-        buf.readerIndex(blockEnd);
 
         // LBS info
 
-        blockLength = buf.readUnsignedShort();
-        blockEnd = buf.readerIndex() + blockLength;
+        int blockLength = buf.readUnsignedShort();
+        int blockEnd = buf.readerIndex() + blockLength;
 
-        if (blockLength > 0 && (hardware == 0x10A || hardware == 0x10B)) {
+        if (blockLength > 0 && (hardware == 0x10A || hardware == 0x10B || hardware == 0x406)) {
             position.setNetwork(new Network(
                     CellTower.fromLacCid(buf.readUnsignedShort(), buf.readUnsignedShort())));
         }
@@ -226,7 +270,7 @@ public class TzoneProtocolDecoder extends BaseProtocolDecoder {
 
         buf.readerIndex(blockEnd);
 
-        if (hardware == 0x10A || hardware == 0x10B) {
+        if (hardware == 0x10B) {
 
             decodeCards(position, buf);
 
@@ -234,6 +278,12 @@ public class TzoneProtocolDecoder extends BaseProtocolDecoder {
             buf.skipBytes(buf.readUnsignedShort()); // lock
 
             decodePassengers(position, buf);
+
+        }
+
+        if (hardware == 0x406) {
+
+            decodeTags(position, buf);
 
         }
 

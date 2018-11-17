@@ -19,7 +19,6 @@ import io.netty.buffer.ByteBuf;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
 import org.traccar.BaseFrameDecoder;
-import org.traccar.helper.Log;
 
 public class CellocatorFrameDecoder extends BaseFrameDecoder {
 
@@ -54,7 +53,6 @@ public class CellocatorFrameDecoder extends BaseFrameDecoder {
                 length = 15 + buf.getUnsignedByte(13);
                 break;
             default:
-                Log.warning(new UnsupportedOperationException(String.valueOf(type)));
                 break;
         }
 

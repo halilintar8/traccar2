@@ -18,22 +18,19 @@ package org.traccar.protocol;
 import org.traccar.BaseProtocol;
 import org.traccar.PipelineBuilder;
 import org.traccar.TrackerServer;
-
-import java.util.List;
+import org.traccar.model.Command;
 
 public class BceProtocol extends BaseProtocol {
 
     public BceProtocol() {
-        super("bce");
-    }
-
-    @Override
-    public void initTrackerServers(List<TrackerServer> serverList) {
-        serverList.add(new TrackerServer(false, getName()) {
+        setSupportedDataCommands(
+                Command.TYPE_OUTPUT_CONTROL);
+        addServer(new TrackerServer(false, getName()) {
             @Override
             protected void addProtocolHandlers(PipelineBuilder pipeline) {
-                pipeline.addLast("frameDecoder", new BceFrameDecoder());
-                pipeline.addLast("objectDecoder", new BceProtocolDecoder(BceProtocol.this));
+                pipeline.addLast(new BceFrameDecoder());
+                pipeline.addLast(new BceProtocolEncoder());
+                pipeline.addLast(new BceProtocolDecoder(BceProtocol.this));
             }
         });
     }

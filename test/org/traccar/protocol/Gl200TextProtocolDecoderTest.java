@@ -8,7 +8,28 @@ public class Gl200TextProtocolDecoderTest extends ProtocolTest {
     @Test
     public void testDecode() throws Exception {
 
-        Gl200TextProtocolDecoder decoder = new Gl200TextProtocolDecoder(new Gl200Protocol());
+        Gl200TextProtocolDecoder decoder = new Gl200TextProtocolDecoder(null);
+
+        verifyPositions(decoder, buffer(
+                "+RESP:GTERI,310701,863286023712855,,00000004,28378,10,1,1,0.0,294,358.4,14.271475,50.110771,20181111185001,0230,0003,94D4,3B30,00,14.5,,,,110000,2,0,C03FFFFF,,0,H46400,12310.70,0,0,83,,,,0,,0.53,3.43,,,,40,,0,,,20181111185252,2DFF"));
+
+        verifyAttributes(decoder, buffer(
+                "+RESP:GTCAN,310701,863286023712855,,10,0,003FFFFF,,2,H46358,12305.50,601,0,83,,P53.00,,0,2749.15,0.19,2.80,,,,40,,0,,,20181110103016,2945$"));
+
+        verifyAttributes(decoder, buffer(
+                "+RESP:GTCAN,310701,863286023712855,,10,0,203FFFFF,,2,H46358,12305.50,601,0,83,,P53.00,,0,2749.15,0.19,2.80,,,,40,,0,,,007FFFFF,,,,,,0,,,134,37,6,0.19,,0.00,0,,,,,,0,0,0,20181110112126,299F$"));
+
+        verifyPosition(decoder, buffer(
+                "+RESP:GTCAN,310701,863286023712855,,10,0,E03FFFFF,,2,H46358,12305.50,601,0,83,,P53.00,,0,2749.15,0.19,2.80,,,,40,,0,,,007FFFFF,,,,,,0,,,134,37,6,0.19,,0.00,0,,,,,,0,0,0,0,0.0,312,358.4,14.271460,50.110796,20181110103130,0230,0003,94D4,3B30,00,20181110105348,2969$"));
+
+        verifyPositions(decoder, buffer(
+                "+RESP:GTFRI,1F0301,862193022001432,WF0GXXGBBGBM26503,,14900,41,1,1,11.6,74,356.0,14.120023,50.167894,20181104080703,0230,0003,9B14,5891,00,74.1,,,,83,220000,799,7.3,,20181104080703,099B$"));
+
+        verifyPosition(decoder, buffer(
+                "+RESP:GTCAN,4B0201,867995030001575,,10,0,C03FFFFF,,0,H0,,,,,,,,,,0.00,0.03,,,,0,,0,,,0,10.0,310,404.3,14.096743,50.143363,20181102110535,0230,0003,9B14,5066,00,20181102112101,03E0$"));
+
+        verifyPositions(decoder, buffer(
+                "+RESP:GTSTR,440502,866427030112088,GL530,0,0,2,,100,3,0.6,0,127.5,2.413963,48.877096,20180704180102,0208,0001,0310,E625,,,0000,20180704180100,004C$"));
 
         verifyPosition(decoder, buffer(
                 "+RESP:GTLSW,300500,860599002636595,,0,0,0,0.0,0,2886.5,-78.467145,-0.165335,20180518221815,,,,,,20180518221817,B6FD$"));
@@ -178,7 +199,7 @@ public class Gl200TextProtocolDecoderTest extends ProtocolTest {
         verifyAttributes(decoder, buffer(
                 "+BUFF:GTINF,1A0800,860599000773978,GL300,41,89701016426133851978,23,0,1,204.7,,3.84,1,1,0,0,0,20161006072548,62,1,38,,,20161006082343,0C98$"));
 
-        verifyPosition(decoder, buffer(
+        verifyPositions(decoder, buffer(
                 "+RESP:GTFRI,360100,864251020141408,3VWGW6AJ0FM237324,gv500,,10,1,1,0.0,0,2258.4,-99.256948,19.555800,20160929214743,0334,0020,0084,65AC,00,0.0,,,,100,410000,0,nan,,20160929214743,13BA$"));
 
         verifyPosition(decoder, buffer(

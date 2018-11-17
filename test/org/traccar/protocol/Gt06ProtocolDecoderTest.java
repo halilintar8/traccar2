@@ -8,13 +8,19 @@ public class Gt06ProtocolDecoderTest extends ProtocolTest {
     @Test
     public void testDecode() throws Exception {
 
-        Gt06ProtocolDecoder decoder = new Gt06ProtocolDecoder(new Gt06Protocol());
+        Gt06ProtocolDecoder decoder = new Gt06ProtocolDecoder(null);
 
         verifyNull(decoder, binary(
                 "787805120099abec0d0a"));
 
         verifyNull(decoder, binary(
                 "78780D01086471700328358100093F040D0A"));
+
+        verifyPosition(decoder, binary(
+                "78783c3439000000120a0902093a07031f9e690529be2e00155500000016214901a30308b70000b3fb004aa82b059401a3422100000001000000007d9370b90d0a"));
+
+        verifyAttributes(decoder, binary(
+                "7878079404eb001c705d0d0a"));
 
         verifyNotNull(decoder, binary(
                 "78781219028f0a29e10036f12003040102000875dc0d0a"));

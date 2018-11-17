@@ -19,9 +19,10 @@ import io.netty.channel.Channel;
 import io.netty.handler.codec.http.FullHttpRequest;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.QueryStringDecoder;
-import org.joda.time.format.ISODateTimeFormat;
 import org.traccar.BaseHttpProtocolDecoder;
 import org.traccar.DeviceSession;
+import org.traccar.Protocol;
+import org.traccar.helper.DateUtil;
 import org.traccar.model.CellTower;
 import org.traccar.model.Network;
 import org.traccar.model.Position;
@@ -37,7 +38,7 @@ import java.util.Map;
 
 public class OsmAndProtocolDecoder extends BaseHttpProtocolDecoder {
 
-    public OsmAndProtocolDecoder(OsmAndProtocol protocol) {
+    public OsmAndProtocolDecoder(Protocol protocol) {
         super(protocol);
     }
 
@@ -81,8 +82,7 @@ public class OsmAndProtocolDecoder extends BaseHttpProtocolDecoder {
                             position.setTime(new Date(timestamp));
                         } catch (NumberFormatException error) {
                             if (value.contains("T")) {
-                                position.setTime(new Date(
-                                        ISODateTimeFormat.dateTimeParser().parseMillis(value)));
+                                position.setTime(DateUtil.parseDate(value));
                             } else {
                                 DateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
                                 position.setTime(dateFormat.parse(value));

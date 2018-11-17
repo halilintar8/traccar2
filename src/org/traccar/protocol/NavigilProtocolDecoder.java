@@ -21,8 +21,8 @@ import io.netty.channel.Channel;
 import org.traccar.BaseProtocolDecoder;
 import org.traccar.DeviceSession;
 import org.traccar.NetworkMessage;
+import org.traccar.Protocol;
 import org.traccar.helper.Checksum;
-import org.traccar.helper.Log;
 import org.traccar.helper.UnitsConverter;
 import org.traccar.model.Position;
 
@@ -31,7 +31,7 @@ import java.util.Date;
 
 public class NavigilProtocolDecoder extends BaseProtocolDecoder {
 
-    public NavigilProtocolDecoder(NavigilProtocol protocol) {
+    public NavigilProtocolDecoder(Protocol protocol) {
         super(protocol);
     }
 
@@ -301,11 +301,8 @@ public class NavigilProtocolDecoder extends BaseProtocolDecoder {
             case MSG_TRACKING_DATA:
                 return parseTrackingData(deviceSession, buf, sequenceNumber, timestamp);
             default:
-                Log.warning(new UnsupportedOperationException(String.valueOf(messageId)));
-                break;
+                return null;
         }
-
-        return null;
     }
 
 }

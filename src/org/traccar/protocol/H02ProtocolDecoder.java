@@ -21,6 +21,7 @@ import io.netty.channel.Channel;
 import org.traccar.BaseProtocolDecoder;
 import org.traccar.DeviceSession;
 import org.traccar.NetworkMessage;
+import org.traccar.Protocol;
 import org.traccar.helper.BcdUtil;
 import org.traccar.helper.BitUtil;
 import org.traccar.helper.DateBuilder;
@@ -40,7 +41,7 @@ import java.util.regex.Pattern;
 
 public class H02ProtocolDecoder extends BaseProtocolDecoder {
 
-    public H02ProtocolDecoder(H02Protocol protocol) {
+    public H02ProtocolDecoder(Protocol protocol) {
         super(protocol);
     }
 
@@ -73,7 +74,7 @@ public class H02ProtocolDecoder extends BaseProtocolDecoder {
 
         if (!BitUtil.check(status, 0)) {
             position.set(Position.KEY_ALARM, Position.ALARM_VIBRATION);
-        } else if (!BitUtil.check(status, 1)) {
+        } else if (!BitUtil.check(status, 1) || !BitUtil.check(status, 18)) {
             position.set(Position.KEY_ALARM, Position.ALARM_SOS);
         } else if (!BitUtil.check(status, 2)) {
             position.set(Position.KEY_ALARM, Position.ALARM_OVERSPEED);
@@ -107,10 +108,18 @@ public class H02ProtocolDecoder extends BaseProtocolDecoder {
 
         Position position = new Position(getProtocolName());
 
+        boolean longId = buf.readableBytes() == 42;
+
         buf.readByte(); // marker
 
-        DeviceSession deviceSession = getDeviceSession(
-                channel, remoteAddress, ByteBufUtil.hexDump(buf.readSlice(5)));
+        String id;
+        if (longId) {
+            id = ByteBufUtil.hexDump(buf.readSlice(8)).substring(0, 15);
+        } else {
+            id = ByteBufUtil.hexDump(buf.readSlice(5));
+        }
+
+        DeviceSession deviceSession = getDeviceSession(channel, remoteAddress, id);
         if (deviceSession == null) {
             return null;
         }
@@ -183,6 +192,7 @@ public class H02ProtocolDecoder extends BaseProtocolDecoder {
             .expression("([EW]),")
             .number("(d+.?d*),")                 // speed
             .number("(d+.?d*)?,")                // course
+            .number("(?:d+,)?")                  // battery
             .number("(?:(dd)(dd)(dd))?")         // date (ddmmyy)
             .groupBegin()
             .expression(",[^,]*,")

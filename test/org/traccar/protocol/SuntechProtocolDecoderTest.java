@@ -8,7 +8,7 @@ public class SuntechProtocolDecoderTest extends ProtocolTest {
     @Test
     public void testDecodeTemperature() throws Exception {
 
-        SuntechProtocolDecoder decoder = new SuntechProtocolDecoder(new SuntechProtocol());
+        SuntechProtocolDecoder decoder = new SuntechProtocolDecoder(null);
 
         decoder.setHbm(true);
         decoder.setIncludeAdc(true);
@@ -20,12 +20,18 @@ public class SuntechProtocolDecoderTest extends ProtocolTest {
         verifyPosition(decoder, text(
                 "ST300EVT;205173382;07;564;20160322;23:23:18;232e19;+19.288278;-099.128750;000.122;000.00;9;1;478391;11.53;000100;2;1;9498;079324;4.3;1;0.00;0.00;0.00;00000000000000;0;2898E16006000058:-20.8;2861626006000039:+2.5;:"));
 
+        verifyPosition(decoder, text(
+                "ST600STT;008349958;35;523;20181112;00:49:30;0bf10d4e;334;20;2f19;22;+20.552718;-100.824478;050.021;095.41;12;1;1303603;14.30;10000000;4;8911;001987;4.1;0;0.00;;;;00000000000000;0;2826C8A70800000C:+26.6;:;:"));
+
     }
 
     @Test
     public void testDecode() throws Exception {
 
-        SuntechProtocolDecoder decoder = new SuntechProtocolDecoder(new SuntechProtocol());
+        SuntechProtocolDecoder decoder = new SuntechProtocolDecoder(null);
+
+        verifyPosition(decoder, text(
+                "ST410STT;007272376;408;01;21651;732;123;-65;1824;1;21654;732;123;1824;0;0;22542;732;123;1824;0;0;21656;732;123;1824;0;0;21655;732;123;1824;0;0;22541;732;123;1824;0;0;0;0;0;0;0;0;3.7;1;0156;1;20180816;05:18:52;+04.722322;-074.052776;000.074;000.00;10;1"));
 
         verifyPosition(decoder, text(
                 "ST600STT;008084783;20;419;20180308;18:00:36;0032cc3e;736;3;445c;41;-16.530023;-068.084267;018.640;267.99;10;1;11655;13.33;100000;2;0336;000061;4.5;0;0.00"));

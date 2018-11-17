@@ -1,5 +1,5 @@
 /*
- * Copyright 2016 - 2017 Anton Tananaev (anton@traccar.org)
+ * Copyright 2016 - 2018 Anton Tananaev (anton@traccar.org)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,17 +25,20 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.traccar.Config;
 import org.traccar.Context;
-import org.traccar.helper.Log;
 import org.traccar.model.Device;
 import org.traccar.model.DeviceState;
-import org.traccar.model.DeviceTotalDistance;
+import org.traccar.model.DeviceAccumulators;
 import org.traccar.model.Group;
 import org.traccar.model.Position;
 import org.traccar.model.Server;
 
 public class DeviceManager extends BaseObjectManager<Device> implements IdentityManager, ManagableObjects {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(DeviceManager.class);
 
     public static final long DEFAULT_REFRESH_DELAY = 300;
 
@@ -63,6 +66,35 @@ public class DeviceManager extends BaseObjectManager<Device> implements Identity
         dataRefreshDelay = config.getLong("database.refreshDelay", DEFAULT_REFRESH_DELAY) * 1000;
         lookupGroupsAttribute = config.getBoolean("deviceManager.lookupGroupsAttribute");
         refreshLastPositions();
+    }
+
+    @Override
+    public long addUnknownDevice(String uniqueId) {
+        Device device = new Device();
+        device.setName(uniqueId);
+        device.setUniqueId(uniqueId);
+        device.setCategory(Context.getConfig().getString("database.registerUnknown.defaultCategory"));
+
+        long defaultGroupId = Context.getConfig().getLong("database.registerUnknown.defaultGroupId");
+        if (defaultGroupId != 0) {
+            device.setGroupId(defaultGroupId);
+        }
+
+        try {
+            addItem(device);
+
+            LOGGER.info("Automatically registered device " + uniqueId);
+
+            if (defaultGroupId != 0) {
+                Context.getPermissionsManager().refreshDeviceAndGroupPermissions();
+                Context.getPermissionsManager().refreshAllExtendedPermissions();
+            }
+
+            return device.getId();
+        } catch (SQLException e) {
+            LOGGER.warn("Automatic device registration error", e);
+            return 0;
+        }
     }
 
     public void updateDeviceCache(boolean force) throws SQLException {
@@ -93,7 +125,7 @@ public class DeviceManager extends BaseObjectManager<Device> implements Identity
             try {
                 updateDeviceCache(true);
             } catch (SQLException e) {
-                Log.warning(e);
+                LOGGER.warn("Update device cache error", e);
             }
             result = super.getAllItems();
         }
@@ -228,7 +260,7 @@ public class DeviceManager extends BaseObjectManager<Device> implements Identity
                     positions.put(position.getDeviceId(), position);
                 }
             } catch (SQLException error) {
-                Log.warning(error);
+                LOGGER.warn("Load latest positions error", error);
             }
         }
     }
@@ -351,10 +383,15 @@ public class DeviceManager extends BaseObjectManager<Device> implements Identity
         return result;
     }
 
-    public void resetTotalDistance(DeviceTotalDistance deviceTotalDistance) throws SQLException {
-        Position last = positions.get(deviceTotalDistance.getDeviceId());
+    public void resetDeviceAccumulators(DeviceAccumulators deviceAccumulators) throws SQLException {
+        Position last = positions.get(deviceAccumulators.getDeviceId());
         if (last != null) {
-            last.getAttributes().put(Position.KEY_TOTAL_DISTANCE, deviceTotalDistance.getTotalDistance());
+            if (deviceAccumulators.getTotalDistance() != null) {
+                last.getAttributes().put(Position.KEY_TOTAL_DISTANCE, deviceAccumulators.getTotalDistance());
+            }
+            if (deviceAccumulators.getHours() != null) {
+                last.getAttributes().put(Position.KEY_HOURS, deviceAccumulators.getHours());
+            }
             getDataManager().addObject(last);
             updateLatestPosition(last);
         } else {

@@ -20,8 +20,10 @@ import io.netty.buffer.ByteBufUtil;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
 import org.traccar.BaseProtocolDecoder;
+import org.traccar.Context;
 import org.traccar.DeviceSession;
 import org.traccar.NetworkMessage;
+import org.traccar.Protocol;
 import org.traccar.helper.UnitsConverter;
 import org.traccar.model.Position;
 
@@ -37,9 +39,11 @@ import java.util.Set;
 
 public class GalileoProtocolDecoder extends BaseProtocolDecoder {
 
-    public GalileoProtocolDecoder(GalileoProtocol protocol) {
+    public GalileoProtocolDecoder(Protocol protocol) {
         super(protocol);
     }
+
+    private ByteBuf photo;
 
     private static final Map<Integer, Integer> TAG_LENGTH_MAP = new HashMap<>();
 
@@ -92,16 +96,40 @@ public class GalileoProtocolDecoder extends BaseProtocolDecoder {
         return length;
     }
 
-    private void sendReply(Channel channel, int checksum) {
+    private void sendReply(Channel channel, int header, int checksum) {
         if (channel != null) {
             ByteBuf reply = Unpooled.buffer(3);
-            reply.writeByte(0x02);
+            reply.writeByte(header);
             reply.writeShortLE((short) checksum);
             channel.writeAndFlush(new NetworkMessage(reply, channel.remoteAddress()));
         }
     }
 
     private void decodeTag(Position position, ByteBuf buf, int tag) {
+        if (tag >= 0x50 && tag <= 0x57) {
+            position.set(Position.PREFIX_ADC + (tag - 0x50), buf.readUnsignedShortLE());
+        } else if (tag >= 0x60 && tag <= 0x62) {
+            position.set("fuel" + (tag - 0x60), buf.readUnsignedShortLE());
+        } else if (tag >= 0xa0 && tag <= 0xaf) {
+            position.set("can8BitR" + (tag - 0xa0 + 15), buf.readUnsignedByte());
+        } else if (tag >= 0xb0 && tag <= 0xb9) {
+            position.set("can16BitR" + (tag - 0xb0 + 5), buf.readUnsignedShortLE());
+        } else if (tag >= 0xc4 && tag <= 0xd2) {
+            position.set("can8BitR" + (tag - 0xc4), buf.readUnsignedByte());
+        } else if (tag >= 0xd6 && tag <= 0xda) {
+            position.set("can16BitR" + (tag - 0xd6), buf.readUnsignedShortLE());
+        } else if (tag >= 0xdb && tag <= 0xdf) {
+            position.set("can32BitR" + (tag - 0xdb), buf.readUnsignedIntLE());
+        } else if (tag >= 0xe2 && tag <= 0xe9) {
+            position.set("userData" + (tag - 0xe2), buf.readUnsignedIntLE());
+        } else if (tag >= 0xf0 && tag <= 0xf9) {
+            position.set("can32BitR" + (tag - 0xf0 + 5), buf.readUnsignedIntLE());
+        } else {
+            decodeTagOther(position, buf, tag);
+        }
+    }
+
+    private void decodeTagOther(Position position, ByteBuf buf, int tag) {
         switch (tag) {
             case 0x01:
                 position.set(Position.KEY_VERSION_HW, buf.readUnsignedByte());
@@ -125,6 +153,9 @@ public class GalileoProtocolDecoder extends BaseProtocolDecoder {
             case 0x34:
                 position.setAltitude(buf.readShortLE());
                 break;
+            case 0x35:
+                position.set(Position.KEY_HDOP, buf.readUnsignedByte() * 0.1);
+                break;
             case 0x40:
                 position.set(Position.KEY_STATUS, buf.readUnsignedShortLE());
                 break;
@@ -146,21 +177,17 @@ public class GalileoProtocolDecoder extends BaseProtocolDecoder {
             case 0x46:
                 position.set(Position.KEY_INPUT, buf.readUnsignedShortLE());
                 break;
-            case 0x50:
-            case 0x51:
-            case 0x52:
-            case 0x53:
-            case 0x54:
-            case 0x55:
-            case 0x56:
-            case 0x57:
-                position.set(Position.PREFIX_ADC + (tag - 0x50), buf.readUnsignedShortLE());
+            case 0x48:
+                position.set("statusExtended", buf.readUnsignedShortLE());
                 break;
             case 0x58:
                 position.set("rs2320", buf.readUnsignedShortLE());
                 break;
             case 0x59:
                 position.set("rs2321", buf.readUnsignedShortLE());
+                break;
+            case 0x90:
+                position.set(Position.KEY_DRIVER_UNIQUE_ID, String.valueOf(buf.readUnsignedIntLE()));
                 break;
             case 0xc0:
                 position.set("fuelTotal", buf.readUnsignedIntLE() * 0.5);
@@ -176,37 +203,6 @@ public class GalileoProtocolDecoder extends BaseProtocolDecoder {
             case 0xc3:
                 position.set("canB1", buf.readUnsignedIntLE());
                 break;
-            case 0xc4:
-            case 0xc5:
-            case 0xc6:
-            case 0xc7:
-            case 0xc8:
-            case 0xc9:
-            case 0xca:
-            case 0xcb:
-            case 0xcc:
-            case 0xcd:
-            case 0xce:
-            case 0xcf:
-            case 0xd0:
-            case 0xd1:
-            case 0xd2:
-                position.set("can8Bit" + (tag - 0xc4), buf.readUnsignedByte());
-                break;
-            case 0xd6:
-            case 0xd7:
-            case 0xd8:
-            case 0xd9:
-            case 0xda:
-                position.set("can16Bit" + (tag - 0xd6), buf.readUnsignedShortLE());
-                break;
-            case 0xdb:
-            case 0xdc:
-            case 0xdd:
-            case 0xde:
-            case 0xdf:
-                position.set("can32Bit" + (tag - 0xdb), buf.readUnsignedIntLE());
-                break;
             case 0xd4:
                 position.set(Position.KEY_ODOMETER, buf.readUnsignedIntLE());
                 break;
@@ -216,16 +212,6 @@ public class GalileoProtocolDecoder extends BaseProtocolDecoder {
             case 0xe1:
                 position.set(Position.KEY_RESULT,
                         buf.readSlice(buf.readUnsignedByte()).toString(StandardCharsets.US_ASCII));
-                break;
-            case 0xe2:
-            case 0xe3:
-            case 0xe4:
-            case 0xe5:
-            case 0xe6:
-            case 0xe7:
-            case 0xe8:
-            case 0xe9:
-                position.set("userData" + (tag - 0xe2), buf.readUnsignedIntLE());
                 break;
             case 0xea:
                 position.set("userDataArray", ByteBufUtil.hexDump(buf.readSlice(buf.readUnsignedByte())));
@@ -243,7 +229,19 @@ public class GalileoProtocolDecoder extends BaseProtocolDecoder {
 
         ByteBuf buf = (ByteBuf) msg;
 
-        buf.readUnsignedByte(); // header
+        int header = buf.readUnsignedByte();
+        if (header == 0x01) {
+            return decodePositions(channel, remoteAddress, buf);
+        } else if (header == 0x07) {
+            return decodePhoto(channel, remoteAddress, buf);
+        }
+
+        return null;
+    }
+
+    private Object decodePositions(
+            Channel channel, SocketAddress remoteAddress, ByteBuf buf) throws Exception {
+
         int length = (buf.readUnsignedShortLE() & 0x7fff) + 3;
 
         List<Position> positions = new LinkedList<>();
@@ -295,13 +293,50 @@ public class GalileoProtocolDecoder extends BaseProtocolDecoder {
             positions.add(position);
         }
 
-        sendReply(channel, buf.readUnsignedShortLE());
+        sendReply(channel, 0x02, buf.readUnsignedShortLE());
 
         for (Position p : positions) {
             p.setDeviceId(deviceSession.getDeviceId());
         }
 
         return positions.isEmpty() ? null : positions;
+    }
+
+    private Object decodePhoto(
+            Channel channel, SocketAddress remoteAddress, ByteBuf buf) throws Exception {
+
+        int length = buf.readUnsignedShortLE();
+
+        Position position = null;
+
+        if (length > 1) {
+
+            if (photo == null) {
+                photo = Unpooled.buffer();
+            }
+
+            buf.readUnsignedByte(); // part number
+            photo.writeBytes(buf, length - 1);
+
+        } else {
+
+            DeviceSession deviceSession = getDeviceSession(channel, remoteAddress);
+            String uniqueId = Context.getIdentityManager().getById(deviceSession.getDeviceId()).getUniqueId();
+
+            position = new Position(getProtocolName());
+            position.setDeviceId(deviceSession.getDeviceId());
+
+            getLastLocation(position, null);
+
+            position.set(Position.KEY_IMAGE, Context.getMediaManager().writeFile(uniqueId, photo, "jpg"));
+            photo.release();
+            photo = null;
+
+        }
+
+        sendReply(channel, 0x07, buf.readUnsignedShortLE());
+
+        return position;
     }
 
 }

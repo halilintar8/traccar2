@@ -22,6 +22,7 @@ import org.traccar.BaseProtocolDecoder;
 import org.traccar.Context;
 import org.traccar.DeviceSession;
 import org.traccar.NetworkMessage;
+import org.traccar.Protocol;
 import org.traccar.helper.Checksum;
 import org.traccar.helper.Parser;
 import org.traccar.helper.PatternBuilder;
@@ -41,7 +42,7 @@ public class MeitrackProtocolDecoder extends BaseProtocolDecoder {
 
     private ByteBuf photo;
 
-    public MeitrackProtocolDecoder(MeitrackProtocol protocol) {
+    public MeitrackProtocolDecoder(Protocol protocol) {
         super(protocol);
     }
 
@@ -115,6 +116,19 @@ public class MeitrackProtocolDecoder extends BaseProtocolDecoder {
                 return Position.ALARM_POWER_CUT;
             case 36:
                 return Position.ALARM_TOW;
+            case 44:
+                return Position.ALARM_JAMMING;
+            case 78:
+                return Position.ALARM_ACCIDENT;
+            case 90:
+            case 91:
+                return Position.ALARM_CORNERING;
+            case 129:
+                return Position.ALARM_BRAKING;
+            case 130:
+                return Position.ALARM_ACCELERATION;
+            case 135:
+                return Position.ALARM_FATIGUE_DRIVING;
             default:
                 return null;
         }

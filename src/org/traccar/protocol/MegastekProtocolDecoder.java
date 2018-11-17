@@ -18,6 +18,7 @@ package org.traccar.protocol;
 import io.netty.channel.Channel;
 import org.traccar.BaseProtocolDecoder;
 import org.traccar.DeviceSession;
+import org.traccar.Protocol;
 import org.traccar.helper.DateBuilder;
 import org.traccar.helper.Parser;
 import org.traccar.helper.PatternBuilder;
@@ -30,7 +31,7 @@ import java.util.regex.Pattern;
 
 public class MegastekProtocolDecoder extends BaseProtocolDecoder {
 
-    public MegastekProtocolDecoder(MegastekProtocol protocol) {
+    public MegastekProtocolDecoder(Protocol protocol) {
         super(protocol);
     }
 
@@ -249,14 +250,22 @@ public class MegastekProtocolDecoder extends BaseProtocolDecoder {
             .number("(d+.d+)?,")                 // odometer
             .number("(d+),")                     // mcc
             .number("(d+),")                     // mnc
-            .number("(xxxx),")                   // lac
-            .number("(x+),")                     // cid
+            .number("(xxxx)?,")                  // lac
+            .number("(x+)?,")                    // cid
             .number("(d+)?,")                    // gsm
-            .expression("([01]+)?,")             // input
-            .expression("([01]+)?,")             // output
+            .groupBegin()
+            .number("([01]{4})?,")               // input
+            .number("([01]{4})?,")               // output
             .number("(d+)?,")                    // adc1
             .number("(d+)?,")                    // adc2
             .number("(d+)?,")                    // adc3
+            .or()
+            .number("(d+),")                     // input
+            .number("(d+),")                     // output
+            .number("(d+),")                     // adc1
+            .number("(d+),")                     // adc2
+            .number("(d+),")                     // adc3
+            .groupEnd()
             .groupBegin()
             .number("(-?d+.?d*)")                // temperature 1
             .or().text(" ")
@@ -308,14 +317,33 @@ public class MegastekProtocolDecoder extends BaseProtocolDecoder {
             position.set(Position.KEY_ODOMETER, parser.nextDouble(0) * 1000);
         }
 
-        position.setNetwork(new Network(CellTower.from(
-                parser.nextInt(0), parser.nextInt(0), parser.nextHexInt(0), parser.nextHexInt(0), parser.nextInt(0))));
+        int mcc = parser.nextInt();
+        int mnc = parser.nextInt();
+        Integer lac = parser.nextHexInt();
+        Integer cid = parser.nextHexInt();
+        Integer rssi = parser.nextInt();
+        if (lac != null && cid != null) {
+            CellTower tower = CellTower.from(mcc, mnc, lac, cid);
+            if (rssi != null) {
+                tower.setSignalStrength(rssi);
+            }
+            position.setNetwork(new Network(tower));
+        }
 
-        position.set(Position.KEY_INPUT, parser.nextBinInt(0));
-        position.set(Position.KEY_OUTPUT, parser.nextBinInt(0));
+        if (parser.hasNext(5)) {
+            position.set(Position.KEY_INPUT, parser.nextBinInt(0));
+            position.set(Position.KEY_OUTPUT, parser.nextBinInt(0));
+            for (int i = 1; i <= 3; i++) {
+                position.set(Position.PREFIX_ADC + i, parser.nextInt(0));
+            }
+        }
 
-        for (int i = 1; i <= 3; i++) {
-            position.set(Position.PREFIX_ADC + i, parser.nextInt(0));
+        if (parser.hasNext(5)) {
+            position.set(Position.KEY_HEART_RATE, parser.nextInt());
+            position.set(Position.KEY_STEPS, parser.nextInt());
+            position.set("activityTime", parser.nextInt());
+            position.set("lightSleepTime", parser.nextInt());
+            position.set("deepSleepTime", parser.nextInt());
         }
 
         for (int i = 1; i <= 2; i++) {

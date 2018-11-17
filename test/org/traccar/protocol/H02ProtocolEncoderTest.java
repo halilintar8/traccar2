@@ -1,16 +1,22 @@
 package org.traccar.protocol;
 
-import org.joda.time.DateTime;
 import org.junit.Test;
 import org.traccar.ProtocolTest;
 import org.traccar.model.Command;
+
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.time.ZoneOffset;
+import java.util.Date;
 
 import static org.junit.Assert.assertEquals;
 
 public class H02ProtocolEncoderTest extends ProtocolTest {
 
     private H02ProtocolEncoder encoder = new H02ProtocolEncoder();
-    private DateTime time = new DateTime().withHourOfDay(1).withMinuteOfHour(2).withSecondOfMinute(3);
+    private Date time = Date.from(
+            LocalDateTime.of(LocalDate.now(), LocalTime.of(1, 2, 3)).atZone(ZoneOffset.systemDefault()).toInstant());
 
     @Test
     public void testAlarmArmEncode() throws Exception {
@@ -39,7 +45,7 @@ public class H02ProtocolEncoderTest extends ProtocolTest {
         command.setDeviceId(1);
         command.setType(Command.TYPE_ENGINE_STOP);
 
-        assertEquals("*HQ,123456789012345,S20,010203,1,3,10,3,5,5,3,5,3,5,3,5#", encoder.encodeCommand(command, time));
+        assertEquals("*HQ,123456789012345,S20,010203,1,1#", encoder.encodeCommand(command, time));
     }
 
     @Test
@@ -49,7 +55,7 @@ public class H02ProtocolEncoderTest extends ProtocolTest {
         command.setDeviceId(1);
         command.setType(Command.TYPE_ENGINE_RESUME);
 
-        assertEquals("*HQ,123456789012345,S20,010203,0,0#", encoder.encodeCommand(command, time));
+        assertEquals("*HQ,123456789012345,S20,010203,1,0#", encoder.encodeCommand(command, time));
     }
 
     @Test

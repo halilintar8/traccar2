@@ -29,6 +29,8 @@ import io.netty.channel.ChannelPromise;
 import io.netty.channel.socket.DatagramChannel;
 import io.netty.channel.socket.DatagramPacket;
 import io.netty.handler.timeout.IdleStateHandler;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.traccar.events.CommandResultEventHandler;
 import org.traccar.events.DriverEventHandler;
 import org.traccar.events.FuelDropEventHandler;
@@ -38,13 +40,15 @@ import org.traccar.events.MaintenanceEventHandler;
 import org.traccar.events.MotionEventHandler;
 import org.traccar.events.OverspeedEventHandler;
 import org.traccar.events.AlertEventHandler;
-import org.traccar.helper.Log;
 import org.traccar.processing.ComputedAttributesHandler;
 import org.traccar.processing.CopyAttributesHandler;
 
 import java.net.InetSocketAddress;
+import java.util.Map;
 
 public abstract class BasePipelineFactory extends ChannelInitializer<Channel> {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(BasePipelineFactory.class);
 
     private final TrackerServer server;
     private int timeout;
@@ -155,7 +159,7 @@ public abstract class BasePipelineFactory extends ChannelInitializer<Channel> {
             message.append(" HEX: ");
             message.append(ByteBufUtil.hexDump((ByteBuf) networkMessage.getMessage()));
 
-            Log.debug(message.toString());
+            LOGGER.info(message.toString());
         }
 
     }
@@ -230,21 +234,42 @@ public abstract class BasePipelineFactory extends ChannelInitializer<Channel> {
 
     protected abstract void addProtocolHandlers(PipelineBuilder pipeline);
 
+    private void addHandlers(ChannelPipeline pipeline, ChannelHandler... handlers) {
+        for (ChannelHandler handler : handlers) {
+            if (handler != null) {
+                pipeline.addLast(handler);
+            }
+        }
+    }
+
+    public static <T extends ChannelHandler> T getHandler(ChannelPipeline pipeline, Class<T> clazz) {
+        for (Map.Entry<String, ChannelHandler> handlerEntry : pipeline) {
+            ChannelHandler handler = handlerEntry.getValue();
+            if (handler instanceof WrapperInboundHandler) {
+                handler = ((WrapperInboundHandler) handler).getWrappedHandler();
+            } else if (handler instanceof WrapperOutboundHandler) {
+                handler = ((WrapperOutboundHandler) handler).getWrappedHandler();
+            }
+            if (clazz.isAssignableFrom(handler.getClass())) {
+                return (T) handler;
+            }
+        }
+        return null;
+    }
+
     @Override
     protected void initChannel(Channel channel) throws Exception {
         final ChannelPipeline pipeline = channel.pipeline();
         if (timeout > 0 && !server.isDatagram()) {
-            pipeline.addLast("idleHandler", new IdleStateHandler(timeout, 0, 0));
+            pipeline.addLast(new IdleStateHandler(timeout, 0, 0));
         }
-        pipeline.addLast("openHandler", new OpenChannelHandler(server));
-        pipeline.addLast("messageHandler", new NetworkMessageHandler());
-        if (Context.isLoggerEnabled()) {
-            pipeline.addLast("logger", new StandardLoggingHandler());
-        }
+        pipeline.addLast(new OpenChannelHandler(server));
+        pipeline.addLast(new NetworkMessageHandler());
+        pipeline.addLast(new StandardLoggingHandler());
 
         addProtocolHandlers(new PipelineBuilder() {
             @Override
-            public void addLast(String name, ChannelHandler handler) {
+            public void addLast(ChannelHandler handler) {
                 if (!(handler instanceof BaseProtocolDecoder || handler instanceof BaseProtocolEncoder)) {
                     if (handler instanceof ChannelInboundHandler) {
                         handler = new WrapperInboundHandler((ChannelInboundHandler) handler);
@@ -252,107 +277,60 @@ public abstract class BasePipelineFactory extends ChannelInitializer<Channel> {
                         handler = new WrapperOutboundHandler((ChannelOutboundHandler) handler);
                     }
                 }
-                pipeline.addLast(name, handler);
+                pipeline.addLast(handler);
             }
         });
 
-        if (geolocationHandler != null) {
-            pipeline.addLast("location", geolocationHandler);
-        }
-        if (hemisphereHandler != null) {
-            pipeline.addLast("hemisphere", hemisphereHandler);
-        }
-
-        if (distanceHandler != null) {
-            pipeline.addLast("distance", distanceHandler);
-        }
-
-        if (remoteAddressHandler != null) {
-            pipeline.addLast("remoteAddress", remoteAddressHandler);
-        }
+        addHandlers(
+                pipeline,
+                geolocationHandler,
+                hemisphereHandler,
+                distanceHandler,
+                remoteAddressHandler);
 
         addDynamicHandlers(pipeline);
 
-        if (filterHandler != null) {
-            pipeline.addLast("filter", filterHandler);
-        }
-
-        if (geocoderHandler != null) {
-            pipeline.addLast("geocoder", geocoderHandler);
-        }
-
-        if (motionHandler != null) {
-            pipeline.addLast("motion", motionHandler);
-        }
-
-        if (engineHoursHandler != null) {
-            pipeline.addLast("engineHours", engineHoursHandler);
-        }
-
-        if (copyAttributesHandler != null) {
-            pipeline.addLast("copyAttributes", copyAttributesHandler);
-        }
-
-        if (computedAttributesHandler != null) {
-            pipeline.addLast("computedAttributes", computedAttributesHandler);
-        }
+        addHandlers(
+                pipeline,
+                filterHandler,
+                geocoderHandler,
+                motionHandler,
+                engineHoursHandler,
+                copyAttributesHandler,
+                computedAttributesHandler);
 
         if (Context.getDataManager() != null) {
-            pipeline.addLast("dataHandler", new DefaultDataHandler());
+            pipeline.addLast(new DefaultDataHandler());
         }
 
         if (Context.getConfig().getBoolean("forward.enable")) {
-            pipeline.addLast("webHandler", new WebDataHandler(Context.getConfig().getString("forward.url"),
-                    Context.getConfig().getBoolean("forward.json")));
+            pipeline.addLast(Main.getInjector().getInstance(WebDataHandler.Factory.class).create(
+                    Context.getConfig().getString("forward.url"), Context.getConfig().getBoolean("forward.json")));
         }
 
-        if (commandResultEventHandler != null) {
-            pipeline.addLast("CommandResultEventHandler", commandResultEventHandler);
-        }
+        addHandlers(
+                pipeline,
+                commandResultEventHandler,
+                overspeedEventHandler,
+                fuelDropEventHandler,
+                motionEventHandler,
+                geofenceEventHandler,
+                alertEventHandler,
+                ignitionEventHandler,
+                maintenanceEventHandler,
+                driverEventHandler);
 
-        if (overspeedEventHandler != null) {
-            pipeline.addLast("OverspeedEventHandler", overspeedEventHandler);
-        }
-
-        if (fuelDropEventHandler != null) {
-            pipeline.addLast("FuelDropEventHandler", fuelDropEventHandler);
-        }
-
-        if (motionEventHandler != null) {
-            pipeline.addLast("MotionEventHandler", motionEventHandler);
-        }
-
-        if (geofenceEventHandler != null) {
-            pipeline.addLast("GeofenceEventHandler", geofenceEventHandler);
-        }
-
-        if (alertEventHandler != null) {
-            pipeline.addLast("AlertEventHandler", alertEventHandler);
-        }
-
-        if (ignitionEventHandler != null) {
-            pipeline.addLast("IgnitionEventHandler", ignitionEventHandler);
-        }
-
-        if (maintenanceEventHandler != null) {
-            pipeline.addLast("MaintenanceEventHandler", maintenanceEventHandler);
-        }
-
-        if (driverEventHandler != null) {
-            pipeline.addLast("DriverEventHandler", driverEventHandler);
-        }
-
-        pipeline.addLast("mainHandler", new MainEventHandler());
+        pipeline.addLast(new MainEventHandler());
     }
 
     private void addDynamicHandlers(ChannelPipeline pipeline) {
         if (Context.getConfig().hasKey("extra.handlers")) {
             String[] handlers = Context.getConfig().getString("extra.handlers").split(",");
-            for (int i = 0; i < handlers.length; i++) {
+            for (String handler : handlers) {
                 try {
-                    pipeline.addLast("extraHandler." + i, (ChannelHandler) Class.forName(handlers[i]).newInstance());
+                    pipeline.addLast((ChannelHandler) Class.forName(handler).newInstance());
                 } catch (ClassNotFoundException | InstantiationException | IllegalAccessException error) {
-                    Log.warning(error);
+                    LOGGER.warn("Dynamic handler error", error);
                 }
             }
         }
